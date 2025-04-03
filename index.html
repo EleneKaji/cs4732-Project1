@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>WebGL Example File</title>
+
+    <script id="vshader" type="x-shader/x-vertex">
+        attribute vec4 vPosition;
+        attribute vec4 vColor;
+
+        uniform bool isPoints;
+        uniform mat4 modelViewMatrix;
+        uniform mat4 projectionMatrix;
+
+        varying vec4 fColor;
+
+        void main() {
+            gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+
+            if (isPoints) {
+                gl_PointSize = 10.0;
+            }
+            else {
+                fColor = vColor;
+            }
+          }
+    </script>
+
+    <script id="fshader" type="x-shader/x-fragment">
+        precision mediump float;
+        varying vec4 fColor;
+
+        uniform bool isPoints;
+
+        void main() {
+
+            if (isPoints) {
+                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            }
+            else {
+                gl_FragColor = fColor;
+            }
+
+        }
+
+    </script>
+
+    <script src="lib/webgl-utils.js"></script>
+    <script src="lib/initShaders.js"></script>
+    <script src="lib/MV.js"></script>
+
+    <script src="main.js"></script>
+    <script src="Spline.js"></script>
+    <script src="cube.js"></script>
+
+</head>
+
+<body onload="main()">
+
+<div>
+    <canvas id="webgl" width="400" height="400">
+        Please use a browser that supports the "canvas" tag.
+    </canvas>
+
+    <form id="fileupload" enctype="multipart/form-data">
+        <input type="file" id="files" name="files[]" />
+    </form>
+</div>
+
+</body>
+</html>
