@@ -2,7 +2,8 @@ let canvas, gl, program;
 
 let fileUploaded = false;
 
-let controlPoints;
+let controlPoints, rotations;
+let allRotations = [];
 let points = [], allPoints = [];
 let xMin, xMax, yMin, yMax;
 const c = 4;
@@ -10,7 +11,7 @@ const c = 4;
 let eye, modelViewMatrix, projectionMatrix, modelViewMatrixLoc, projectionMatrixLoc;
 let at = vec3(0.0, 0.0, 0.0);
 let up = vec3(0.0, 1.0, 0.0);
-let fovy = 100;
+let fovy = 70;
 
 function main() {
     canvas = document.getElementById("webgl");
@@ -37,34 +38,11 @@ function main() {
     gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
     gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
 
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+    gl.cullFace(gl.BACK);
+
     render();
-}
-
-function handle_img_upload(event) {
-    if (event.target.files[0]) {
-        let file = event.target.files[0];
-        let reader = new FileReader();
-        reader.readAsText(file);
-
-        reader.onload = function () {
-            const fileContent = reader.result;
-            const spline = new Spline();
-            let minMax = spline.loadFromText(fileContent);
-            xMin = minMax.xMin;
-            xMax = minMax.xMax;
-            yMin = minMax.yMin;
-            yMax = minMax.yMax;
-
-            spline.printSpline();
-
-            fileUploaded = true;
-            controlPoints = spline.controlPoints
-
-            calculatePoints(controlPoints);
-            catmullCurve = generateCatmullRomCurve(allPoints);
-            makeCube();
-        }
-    }
 }
 
 function render() {
@@ -73,8 +51,7 @@ function render() {
 
     if (fileUploaded){
 
-        modelViewMatrix = lookAt(eye, at, up);
-        gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
+        gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(lookAt(eye, at, up)));
         gl.uniformMatrix4fv(projectionMatrixLoc, false, flatten(projectionMatrix));
 
         // points
@@ -92,10 +69,16 @@ function render() {
 
 
         // cube
-        moveCube()
-        gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
-
         gl.uniform1f(gl.getUniformLocation(program, "isPoints"), false);
+
+        if (rotateNow){
+            rotateCube()
+        }
+        else {
+            moveCube()
+        }
+
+        gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(modelViewMatrix));
 
         vBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
@@ -119,118 +102,91 @@ function render() {
     requestAnimationFrame(render);
 }
 
-function calculateDistance(p1, p2){
-    return Math.sqrt(
-        Math.pow((p2[0] - p1[0]), 2) +
-        Math.pow((p2[1] - p1[1]), 2) +
-        Math.pow(((p2[2] || 0.0) - (p1[2] || 0.0)), 2)
-    );
-}
 
-function calculateTranslationMatrix(interpolatedPos){
-    return mat4(
-        1.0, 0.0, 0.0, interpolatedPos[0],
-        0.0, 1.0, 0.0, interpolatedPos[1],
-        0.0, 0.0, 1.0, interpolatedPos[2] || 0.0,
-        0.0, 0.0, 0.0, 1.0
-    );
-}
+function slerp(q1, q2, t) {
+    q1 = normalize(q1);
+    q2 = normalize(q2);
 
-function calculatePoints(){
-    for (let i = 0; i < controlPoints.length - 2; i +=3) {
-        let posX = controlPoints[i];
-        let posY = controlPoints[i + 1];
-        let posZ = controlPoints[i + 2];
+    let dotProduct = dot(q1, q2);
 
-        let x = ((posX - (xMin - c)) / ((xMax + c) - (xMin - c))) * 2 - 1;
-        let y = 1 - 2 * ((posY - (yMin - c)) / ((yMax + c) - (yMin - c)));
-
-        points.push(x, y, posZ, 1.0);
-        allPoints.push(vec4(x, y, posZ, 1.0))
+    if (dotProduct < 0) {
+        q2 = negate(q2);
+        dotProduct = -dotProduct;
     }
 
-    console.log(allPoints)
-    console.log(points);
+    if (dotProduct >= 1) {
+        return normalize(mix(q1, q2, t));
+    }
+
+    const theta = Math.acos(dotProduct);
+
+    let coeff1 = Math.sin((1 - t) * theta) / Math.sin(theta);
+    let coeff2 = Math.sin(t * theta) / Math.sin(theta);
+
+    return normalize(q1.map((q1i, i) => coeff1 * q1i + coeff2 * q2[i]));
 }
 
-let currentIdx = 0;
-let t = 0;
+let rotIdx = 0;
 
-function moveCube(){
-    let p1 = catmullCurve[currentIdx]
-    let p2 = catmullCurve[currentIdx + 1]
+function rotateCube() {
+    if (rotIdx >= indices.length - 1) {
+        console.log("rotation reached");
+        movingCount++;
+        rotIdx = 0;
 
-    let segmentDistance = calculateDistance(p1, p2);
-    console.log(p1, p2, "segments length: ", segmentDistance);
-    t += (0.001 / segmentDistance);
+        if (movingCount % 2 === 0) {
+            curvePoints = generateBSpline(allPoints)
+            console.log("new curve points (BSpline)", curvePoints)
+        }
+        else {
+            curvePoints = generateCatmullRomCurve(allPoints);
+            console.log("new curve points (CatmullRomCurve)", curvePoints)
+        }
+
+        rotateNow = false;
+        return
+    }
+
+    let q1 = allRotations[rotIdx];
+    let q2 = allRotations[rotIdx + 1];
+
+    if (q1[0] === q2[0] && q1[1] === q2[1] && q1[2] === q2[2] && q1[3] === q2[3]) {
+        rotIdx++;
+        startTime = performance.now();
+        return;
+    }
+
+    q1 = eulerToQuaternion(q1)
+    q2 = eulerToQuaternion(q2)
+
+    const elapsed = (performance.now() - startTime) / 1000;
+    const t = Math.min(Math.max((elapsed) / 2, 0), 1);
 
     if (t >= 1.0) {
-        console.log("STUCK IN THE WHILE LOOP")
-        t = 0;
-        currentIdx++;
-
-        if (currentIdx >= catmullCurve.length - 1)
-            currentIdx = 0;
-        p1 = catmullCurve[currentIdx];
-        p2 = catmullCurve[currentIdx + 1];
+        rotIdx++;
+        startTime = performance.now();
     }
 
-    let interpolatedPos = [
-        p1[0] + (p2[0] - p1[0]) * t,
-        p1[1] + (p2[1] - p1[1]) * t,
-        p1[2] + (p2[2] - p1[2]) * t,
-    ];
+    let currentQuat = slerp(q1, q2, t);
+    let rotationMatrix = quatToMatrix(currentQuat);
 
-    let translationMatrix = calculateTranslationMatrix(interpolatedPos)
-    modelViewMatrix = mult(translationMatrix, lookAt(eye, at, up));
+    modelViewMatrix = mult(lookAt(eye, at, up), mult(translationMatrix, rotationMatrix));
 }
 
-function matMult(u, M) {
-    let result = [0, 0, 0, 0];
+function eulerToQuaternion(rot) {
+    let roll = rot[0] * Math.PI / 180
+    let pitch = rot[1] * Math.PI / 180
+    let yaw = rot[2] * Math.PI / 180
 
-    for (let i = 0; i < 4; i++) {
-        let sum = 0;
-        for (let j = 0; j < 4; j++) {
-            sum += u[j] * M[j][i];
-        }
-        result[i] = sum;
-    }
+    let cr = Math.cos(roll * 0.5);
+    let sr = Math.sin(roll * 0.5);
+    let cp = Math.cos(pitch * 0.5);
+    let sp = Math.sin(pitch * 0.5);
+    let cy = Math.cos(yaw * 0.5)
+    let sy = Math.sin(yaw * 0.5);
 
-    return result;
-}
-
-let catmullCurve = [];
-function generateCatmullRomCurve(points, segments = 20) {
-
-    console.log(points)
-
-    let curve = [];
-
-    let M = [[-0.5, 1.5, -1.5, 0.5],
-        [1, -2.5, 2, -0.5],
-        [-0.5, 0, 0.5, 0],
-        [0, 1, 0, 0]];
-
-    for (let i = 0; i < points.length - 3; i++) {
-        let p0 = points[i];
-        let p1 = points[i + 1];
-        let p2 = points[i + 2];
-        let p3 = points[i + 3];
-
-        for (let j = 0; j <= segments; j++) {
-            let t = j / segments;
-            let U = vec4([t * t * t, t * t, t, 1])
-
-            let coeff = matMult(U, M);
-
-            let x = p0[0] * coeff[0] + p1[0] * coeff[1] + p2[0] * coeff[2] + p3[0] * coeff[3];
-            let y = p0[1] * coeff[0] + p1[1] * coeff[1] + p2[1] * coeff[2] + p3[1] * coeff[3];
-
-            curve.push(vec4(x, y, 1.0, 1.0));
-        }
-    }
-
-    console.log("curve", curve);
-
-    return curve;
+    return [sr * cp * cy - cr * sp * sy,
+        cr * sp * cy + sr * cp * sy,
+        cr * cp * sy - sr * sp * cy,
+        cr * cp * cy + sr * sp * sy]
 }
