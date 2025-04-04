@@ -28,7 +28,7 @@ function moveCube(){
 
         // start rotation
         if (indices.length > 1 && !arraysEqual(lastIndices, indices)) {
-            console.log("indices", indices);
+            console.log("translation reached");
             rotateNow = true
             lastIndices = indices
             startTime = performance.now();

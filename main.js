@@ -1,4 +1,8 @@
-
+/**
+ * The main function to start, sets up canvas program, gl, as well as other matrices used.
+ * The cube restarts it original position after the catmul, rotation, and Bspline to show a whole loop
+ * of everything working.
+ */
 function main() {
     canvas = document.getElementById("webgl");
 
@@ -31,6 +35,10 @@ function main() {
     render();
 }
 
+/**
+ * Renders the animation. Depending on the rotateNow boolean, it either rotates or translates the cube.
+ * Uses isPoints boolean that gets send to shaders to draw the cube and points separately.
+ */
 function render() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.clearColor(0.0, 0.0, 0.0, 1.0);

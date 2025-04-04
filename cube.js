@@ -1,3 +1,7 @@
+/**
+ * Simple making and drawing the cube. Code we have seen a loot now.
+ */
+
 let cubePoints, cubeColors, initialCubePoints;
 const vertices = [
     vec4( -0.1, -0.1,  0.1, 1.0 ),

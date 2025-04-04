@@ -33,8 +33,6 @@ function generateCatmullRomCurve(points, segments = 20) {
         }
     }
 
-    console.log("curve", curve);
-
     return curve;
 }
 
