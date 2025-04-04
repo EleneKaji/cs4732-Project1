@@ -1,3 +1,7 @@
+/**
+ * Read from spline1.txt to get the number of splines, number of control points, duration time,
+ * control points and rotations per control point.
+ */
 class Spline {
     constructor() {
         this.nSplines = 0;
@@ -8,6 +12,12 @@ class Spline {
         this.rotations = [];
     }
 
+    /**
+     * Read from the text through fileContent, and return the min and max values for x and y from all points
+     * to map the points to canvas correctly
+     * @param fileContent
+     * @returns {{xMin: number, xMax: number, yMin: number, yMax: number}}
+     */
     loadFromText(fileContent) {
         this.resetVariables();
 
@@ -61,6 +71,9 @@ class Spline {
         return {xMin, xMax, yMin, yMax};
     }
 
+    /**
+     * Prints the output of the read txt file
+     */
     printSpline() {
         console.log("Number of splines: ", this.nSplines);
         console.log("Number of control points: ", this.nControlPoints);
@@ -73,6 +86,9 @@ class Spline {
         console.log(this.rotations)
     }
 
+    /**
+     * resets all the variables
+     */
     resetVariables() {
         this.nSplines = 0;
         this.nControlPoints = 0;
